@@ -1,3 +1,9 @@
+import os
+import uuid
+
+from django.core.validators import FileExtensionValidator
+
+from .validators import validate_file_size
 from django.conf import settings
 from django.db import models, transaction
 
@@ -76,6 +82,14 @@ class Project(models.Model):
         ProjectStatusLog.objects.create(
             project=self, from_status=old_status, to_status=self.status, changed_by=user
         )
+        # Queue the email only after the transaction commits, so the worker never
+        # reads a half-saved project. Imported here to avoid a circular import.
+        from .tasks import send_status_change_email
+
+        project_id, new_status = self.pk, self.status
+        transaction.on_commit(
+            lambda: send_status_change_email.delay(project_id, old_status, new_status)
+        )
 
     @transaction.atomic
     def change_status(self, new_status, user):
@@ -109,6 +123,107 @@ class ProjectStatusLog(models.Model):
     changed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True
     )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+# ---------- file paths ----------
+def _unique_name(filename):
+    return f"{uuid.uuid4().hex}{os.path.splitext(filename)[1].lower()}"
+
+
+def reference_path(instance, filename):
+    return f"projects/{instance.project_id}/references/{_unique_name(filename)}"
+
+
+def render_original_path(instance, filename):
+    return f"projects/{instance.project_id}/renders/original/{_unique_name(filename)}"
+
+
+def render_thumb_path(instance, filename):
+    return f"projects/{instance.project_id}/renders/thumbs/{_unique_name(filename)}"
+
+
+def render_preview_path(instance, filename):
+    return f"projects/{instance.project_id}/renders/previews/{_unique_name(filename)}"
+
+
+class ReferenceFile(models.Model):
+    """Files the client supplies: floor plans, CAD drawings, mood boards."""
+
+    ALLOWED_EXTENSIONS = ["pdf", "jpg", "jpeg", "png", "dwg", "dxf", "skp", "zip"]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="reference_files")
+    file = models.FileField(
+        upload_to=reference_path,
+        validators=[FileExtensionValidator(ALLOWED_EXTENSIONS), validate_file_size],
+    )
+    description = models.CharField(max_length=255, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class Render(models.Model):
+    """One uploaded version of the artist's work, plus the files generated from it."""
+
+    class ProcessingStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        PROCESSING = "processing", "Processing"
+        DONE = "done", "Done"
+        FAILED = "failed", "Failed"
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="renders")
+    version = models.PositiveIntegerField(editable=False)
+    original = models.ImageField(
+        upload_to=render_original_path,
+        width_field="width",
+        height_field="height",
+        validators=[
+            FileExtensionValidator(["jpg", "jpeg", "png", "webp", "tif", "tiff"]),
+            validate_file_size,
+        ],
+    )
+    thumbnail = models.ImageField(upload_to=render_thumb_path, blank=True)
+    preview = models.ImageField(upload_to=render_preview_path, blank=True)
+    width = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    height = models.PositiveIntegerField(null=True, blank=True, editable=False)
+    notes = models.CharField(max_length=500, blank=True)
+    processing_status = models.CharField(
+        max_length=12, choices=ProcessingStatus.choices, default=ProcessingStatus.PENDING
+    )
+    processing_error = models.CharField(max_length=255, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-version"]
+        constraints = [
+            models.UniqueConstraint(fields=["project", "version"], name="unique_render_version")
+        ]
+
+    def __str__(self):
+        return f"{self.project.title} v{self.version}"
+
+
+class Comment(models.Model):
+    """Feedback thread on a project, optionally pointing at a specific render."""
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="comments")
+    render = models.ForeignKey(
+        Render, on_delete=models.SET_NULL, null=True, blank=True, related_name="comments"
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+"
+    )
+    body = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

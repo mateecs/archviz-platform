@@ -150,3 +150,19 @@ MAILERS = {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
 }
+
+
+# --- Celery ---
+CELERY_BROKER_URL = env("REDIS_URL")
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_TASK_TIME_LIMIT = 120  # kill any task that runs longer than 2 minutes
+
+# --- Uploads ---
+MAX_UPLOAD_MB = 30
+WATERMARK_TEXT = "ARCHVIZ PREVIEW"
+
+# --- Email ---
+#EMAIL_BACKEND = env("EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend")
+#DEFAULT_FROM_EMAIL = "ArchViz Platform <noreply@archviz.local>"

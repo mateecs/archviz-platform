@@ -9,6 +9,7 @@ from apps.accounts.permissions import IsAdminRole, IsClientRole
 from .models import InvalidTransition, Project, TransitionNotAllowed
 from .permissions import CanEditProject
 from .serializers import AssignSerializer, ProjectSerializer, StatusChangeSerializer
+from .access import projects_for
 
 
 class ProjectViewSet(
@@ -23,12 +24,7 @@ class ProjectViewSet(
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):  # for API docs generation
             return Project.objects.none()
-        user = self.request.user
-        qs = Project.objects.select_related("client", "artist")
-        if user.role == User.Role.CLIENT:
-            qs = qs.filter(client=user)
-        elif user.role == User.Role.ARTIST:
-            qs = qs.filter(artist=user)
+        qs = projects_for(self.request.user).select_related("client", "artist")
         status = self.request.query_params.get("status")
         if status:
             qs = qs.filter(status=status)

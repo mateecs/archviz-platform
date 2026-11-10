@@ -29,3 +29,17 @@ def artist_user(db):
 @pytest.fixture
 def admin_user(db):
     return UserFactory(role=User.Role.ADMIN, is_staff=True)
+
+
+@pytest.fixture(autouse=True)
+def celery_eager():
+    """Run Celery tasks immediately in-process, so tests need no Redis or worker."""
+    from config.celery import app
+    app.conf.task_always_eager = True
+    app.conf.task_eager_propagates = True
+
+
+@pytest.fixture(autouse=True)
+def tmp_media(settings, tmp_path):
+    """Send uploaded files to a throwaway folder instead of your real media/."""
+    settings.MEDIA_ROOT = tmp_path

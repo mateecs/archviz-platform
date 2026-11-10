@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Project, ProjectStatusLog
+from .models import Comment, Project, ProjectStatusLog, ReferenceFile, Render
 
 
 class StatusLogInline(admin.TabularInline):
@@ -15,3 +15,19 @@ class ProjectAdmin(admin.ModelAdmin):
     list_filter = ("status", "project_type")
     search_fields = ("title", "client__username", "artist__username")
     inlines = [StatusLogInline]
+
+
+@admin.register(Render)
+class RenderAdmin(admin.ModelAdmin):
+    list_display = ("project", "version", "processing_status", "uploaded_by", "created_at")
+    list_filter = ("processing_status",)
+
+
+@admin.register(ReferenceFile)
+class ReferenceFileAdmin(admin.ModelAdmin):
+    list_display = ("project", "file", "uploaded_by", "created_at")
+
+
+@admin.register(Comment)
+class CommentAdmin(admin.ModelAdmin):
+    list_display = ("project", "author", "created_at")
