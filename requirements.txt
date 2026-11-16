@@ -3,8 +3,6 @@ asgiref==3.13.0
 attrs==26.1.0
 billiard==4.3.2
 celery==5.7.0
-certifi==2026.7.22
-charset-normalizer==3.5.1
 click==8.5.1
 click-didyoumean==0.3.1
 click-plugins==1.1.1.2
@@ -17,7 +15,7 @@ djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.30.0
 factory_boy==3.3.3
 Faker==40.44.0
-idna==3.19
+gunicorn==27.0.1
 inflection==0.5.1
 iniconfig==2.3.1
 jsonschema==4.26.0
@@ -37,8 +35,6 @@ python-dateutil==2.9.0.post0
 PyYAML==6.0.3
 redis==8.1.0
 referencing==0.37.0
-requests==2.34.2
-resend==2.39.0
 rpds-py==2026.9.1
 six==1.17.0
 sqlparse==0.6.1
@@ -46,6 +42,6 @@ typing_extensions==4.16.0
 tzdata==2026.6
 tzlocal==5.4.5
 uritemplate==4.2.0
-urllib3==2.7.0
 vine==5.1.0
 wcwidth==0.9.4
+whitenoise==6.12.0
